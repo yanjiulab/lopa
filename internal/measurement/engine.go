@@ -156,7 +156,49 @@ func (e *Engine) CreateUdpTask(params TaskParams) (TaskID, error) {
 	e.cancel[id] = cancel
 	e.mu.Unlock()
 
-	go e.runUdp(ctx, t, r)
+	go e.runTwamp(ctx, t, r)
+
+	return id, nil
+}
+
+// CreateTwampTask creates and starts a TWAMP-light task (target must be a standard Session-Reflector, typically host:862).
+func (e *Engine) CreateTwampTask(params TaskParams) (TaskID, error) {
+	id := TaskID(node.NextTaskID())
+	now := time.Now()
+
+	t := &Task{
+		ID:        id,
+		Params:    params,
+		NodeID:    node.ID(),
+		CreatedAt: now,
+	}
+
+	r := &Result{
+		TaskID:   id,
+		NodeID:   t.NodeID,
+		Target:   params.Target,
+		Type:     params.Type,
+		Mode:     params.Mode,
+		Started:  now,
+		Status:   "running",
+		Rounds:   make([]RoundResult, 0),
+		Total:    Stats{},
+		Window:   nil,
+		Error:    "",
+	}
+
+	e.mu.Lock()
+	e.tasks[id] = t
+	e.results[id] = r
+	e.mu.Unlock()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	e.mu.Lock()
+	e.cancel[id] = cancel
+	e.mu.Unlock()
+
+	go e.runTwamp(ctx, t, r)
 
 	return id, nil
 }
@@ -280,6 +322,41 @@ func (e *Engine) runUdp(ctx context.Context, task *Task, result *Result) {
 		size = 8
 	}
 	pinger := &protocol.UDPProber{
+		Target:     params.Target,
+		Timeout:    params.Timeout,
+		PacketSize: size,
+		Network:    network,
+		SourceIP:   params.SourceIP,
+		Interface:  params.Interface,
+	}
+
+	switch params.Mode {
+	case ModeCount:
+		e.runPingCount(ctx, pinger, task, result)
+	case ModeDuration:
+		e.runPingDuration(ctx, pinger, task, result)
+	case ModeContinuous:
+		e.runPingContinuous(ctx, pinger, task, result)
+	default:
+		log.Warnf("unknown mode %v for task %s", params.Mode, task.ID)
+	}
+}
+
+func (e *Engine) runTwamp(ctx context.Context, task *Task, result *Result) {
+	log := logger.S()
+	params := task.Params
+
+	network := "udp"
+	if params.IPVersion == "ipv4" {
+		network = "udp4"
+	} else if params.IPVersion == "ipv6" {
+		network = "udp6"
+	}
+	size := params.PacketSize
+	if size < 16 {
+		size = 16
+	}
+	pinger := &protocol.TWAMPPinger{
 		Target:     params.Target,
 		Timeout:    params.Timeout,
 		PacketSize: size,

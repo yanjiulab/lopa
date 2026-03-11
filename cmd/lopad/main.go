@@ -48,6 +48,11 @@ func main() {
 		go func() {
 			_ = reflector.Run(ctx, config.Global().Reflector.Addr)
 		}()
+		if twampAddr := config.Global().Reflector.TwampAddr; twampAddr != "" {
+			go func() {
+				_ = reflector.RunTWAMP(ctx, twampAddr)
+			}()
+		}
 	} else {
 		logger.S().Info("reflector disabled by config or --no-reflector")
 	}
