@@ -32,7 +32,7 @@ func init() {
 	pingCmd.Flags().Int("rounds", 1, "rounds for count mode")
 	pingCmd.Flags().Duration("round-interval", 0, "interval between rounds")
 	// continuous mode: webhook alert thresholds
-	pingCmd.Flags().Float64("loss-threshold", 0, "alert when window loss rate >= this (0=disabled, e.g. 0.05 for 5%%)")
+	pingCmd.Flags().Float64("loss-threshold", 0, "alert when window loss rate >= this (0=disabled, e.g. 0.05 for 5%)")
 	pingCmd.Flags().Duration("latency-threshold", 0, "alert when window avg RTT >= this (0=disabled)")
 	pingCmd.Flags().String("alert-callback-url", "", "webhook URL to POST when threshold is exceeded (continuous mode)")
 
